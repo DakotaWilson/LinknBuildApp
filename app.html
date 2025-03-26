@@ -1,0 +1,1240 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D Link Hub</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            font-family: sans-serif;
+            background-color: #111; /* Fallback background */
+            color: #eee;
+        }
+
+        #container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+        }
+
+        #info {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 15px;
+            border-radius: 8px;
+            max-width: 300px;
+            max-height: calc(100vh - 40px); /* Limit height */
+            overflow-y: auto; /* Add scroll if needed */
+            z-index: 10;
+            color: #eee;
+        }
+
+        #info h2, #info h3 {
+            margin-top: 0;
+            margin-bottom: 10px;
+            color: #fff;
+            border-bottom: 1px solid #444;
+            padding-bottom: 5px;
+        }
+
+         #info fieldset {
+            border: 1px solid #555;
+            border-radius: 5px;
+            padding: 10px;
+            margin-bottom: 15px;
+         }
+
+         #info legend {
+            font-weight: bold;
+            color: #0af;
+         }
+
+        #info label {
+            display: block;
+            margin-bottom: 3px;
+            font-size: 0.9em;
+            color: #ccc;
+        }
+
+        #info input[type="text"],
+        #info input[type="url"],
+        #info select,
+        #info input[type="color"],
+        #info button {
+            width: calc(100% - 16px); /* Account for padding */
+            padding: 6px;
+            margin-bottom: 10px;
+            border: 1px solid #444;
+            background-color: #333;
+            color: #eee;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+
+         #info input[type="range"] {
+            width: calc(100% - 16px);
+            margin-bottom: 10px;
+         }
+
+        #info input[type="checkbox"] {
+            margin-right: 5px;
+            vertical-align: middle;
+        }
+
+        #info .checkbox-label {
+            display: inline-block; /* Keep checkbox and label together */
+            margin-bottom: 10px;
+            vertical-align: middle;
+        }
+
+        #info button {
+            cursor: pointer;
+            background-color: #0a7;
+            border-color: #085;
+            font-weight: bold;
+        }
+        #info button:hover {
+            background-color: #0c9;
+        }
+         #info button.secondary {
+             background-color: #555;
+             border-color: #444;
+         }
+         #info button.secondary:hover {
+             background-color: #666;
+         }
+
+        .link-label {
+            background-color: rgba(0, 0, 0, 0.7);
+            color: #fff;
+            padding: 5px 10px;
+            border-radius: 5px;
+            font-size: 14px;
+            white-space: nowrap; /* Prevent wrapping */
+            pointer-events: none; /* Allow clicks to pass through to 3D object */
+            transform: translate(0, -100%); /* Position above the anchor point */
+        }
+
+        /* Cursor styles */
+        body.grabbing, body.grabbing * { cursor: grabbing !important; }
+        body.pointer { cursor: pointer !important; }
+        body.crosshair { cursor: crosshair !important; }
+
+    </style>
+    <!-- Import Map for Three.js Modules -->
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "https://unpkg.com/three@0.164.1/build/three.module.js",
+          "three/addons/": "https://unpkg.com/three@0.164.1/examples/jsm/"
+        }
+      }
+    </script>
+</head>
+<body>
+
+    <div id="info">
+        <h2>3D Link Hub Controls</h2>
+
+        <fieldset>
+            <legend>Placement</legend>
+            <label for="newLinkLabel">Link Label:</label>
+            <input type="text" id="newLinkLabel" placeholder="e.g., Google">
+            <label for="newLinkURL">Link URL:</label>
+            <input type="url" id="newLinkURL" placeholder="https://google.com">
+            <label for="linkShape">Object Shape:</label>
+            <select id="linkShape">
+                <option value="Cube">Cube</option>
+                <option value="Sphere">Sphere</option>
+                <option value="Torus">Torus</option>
+                <option value="Cone">Cone</option>
+                <option value="Icosahedron">Icosahedron</option>
+                <option value="Dodecahedron">Dodecahedron</option>
+            </select>
+             <input type="checkbox" id="enablePlacing">
+             <label for="enablePlacing" class="checkbox-label">Enable Placing Mode</label><br>
+             <input type="checkbox" id="allowOverlap" checked>
+             <label for="allowOverlap" class="checkbox-label">Allow Overlapping Objects</label>
+        </fieldset>
+
+        <fieldset>
+            <legend>Link Appearance</legend>
+            <label for="linkColor">Color Tint:</label>
+            <input type="color" id="linkColor" value="#ffffff">
+            <label for="linkRoughness">Roughness:</label>
+            <input type="range" id="linkRoughness" min="0" max="1" step="0.01" value="0.5">
+            <label for="linkMetalness">Metalness:</label>
+            <input type="range" id="linkMetalness" min="0" max="1" step="0.01" value="0.8">
+        </fieldset>
+
+        <fieldset>
+            <legend>Lighting</legend>
+            <label for="dirLightColor">Directional Light:</label>
+            <input type="color" id="dirLightColor" value="#ffffff">
+            <label for="hemiSkyColor">Hemisphere Sky:</label>
+            <input type="color" id="hemiSkyColor" value="#adccec">
+            <label for="hemiGroundColor">Hemisphere Ground:</label>
+            <input type="color" id="hemiGroundColor" value="#404040">
+        </fieldset>
+
+        <fieldset>
+            <legend>Environment</legend>
+            <input type="checkbox" id="useHdriBackground" checked>
+            <label for="useHdriBackground" class="checkbox-label">Use HDRI Background</label><br>
+            <label for="bgColor">Solid Background Color:</label>
+            <input type="color" id="bgColor" value="#202030" disabled>
+        </fieldset>
+
+        <fieldset>
+            <legend>Effects (Bloom)</legend>
+            <input type="checkbox" id="enableBloom">
+            <label for="enableBloom" class="checkbox-label">Enable Bloom</label><br>
+            <label for="bloomStrength">Strength:</label>
+            <input type="range" id="bloomStrength" min="0" max="3" step="0.05" value="0.6">
+            <label for="bloomRadius">Radius:</label>
+            <input type="range" id="bloomRadius" min="0" max="1" step="0.01" value="0.4">
+            <label for="bloomThreshold">Threshold:</label>
+            <input type="range" id="bloomThreshold" min="0" max="1" step="0.01" value="0.85">
+        </fieldset>
+
+         <fieldset>
+            <legend>Settings</legend>
+             <button id="saveSettingsButton">Save Settings</button>
+             <button id="loadSettingsButton" class="secondary">Reload Settings</button>
+             <button id="resetSettingsButton" class="secondary">Reset Settings</button>
+        </fieldset>
+
+        <p style="font-size: 0.8em; color: #888;">Note: Placed links are not saved between sessions.</p>
+
+    </div>
+
+    <div id="container"></div>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+        import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
+        import { RGBELoader } from 'three/addons/loaders/RGBELoader.js';
+        import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+        import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+        import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+
+        // --- Constants ---
+        const HOVER_SCALE = 1.1;
+        const HOVER_EMISSIVE_COLOR = new THREE.Color(0x555555);
+        const LINK_VERTICAL_OFFSET = 0.1; // Extra vertical space above platform
+        const PLATFORM_SIZE = 30;
+        const HDRI_URL = 'https://unpkg.com/three@0.164.1/examples/textures/equirectangular/venice_sunset_1k.hdr'; // Example HDRI
+        // Texture URLs (replace with your actual texture paths if needed)
+        const GROUND_NORMAL_URL = 'https://unpkg.com/three@0.164.1/examples/textures/terrain/grasslight-big-nm.jpg';
+        const GROUND_ROUGHNESS_URL = 'https://unpkg.com/three@0.164.1/examples/textures/terrain/roughness_map.jpg'; // Use a generic roughness map
+        const LINK_METAL_URL = 'https://unpkg.com/three@0.164.1/examples/textures/Metal007_1K_Metalness.jpg'; // Example metalness map
+
+        const SETTINGS_KEY = '3dLinkHubSettings';
+
+        // --- Global Variables ---
+        let scene, camera, renderer, controls, labelRenderer, composer, bloomPass;
+        let pmremGenerator;
+        let directionalLight, hemisphereLight;
+        let platformMesh;
+        let linkObjects = []; // Stores { mesh: THREE.Mesh, label: CSS2DObject }
+        let linksData = [];   // Stores { label: string, url: string, position: THREE.Vector3 } for recreation
+        let raycaster, mouse;
+        let currentHovered = null; // { object: THREE.Mesh, originalScale: THREE.Vector3, originalEmissive: THREE.Color }
+        let placingEnabled = false;
+        let allowOverlap = true;
+        let useHdriBg = true;
+        let bloomEnabled = false;
+        let hdriTexture = null;
+        let groundNormalMap = null;
+        let groundRoughnessMap = null;
+        let linkMetalMap = null;
+        let isDragging = false; // Track mouse dragging state
+
+        // --- DOM Elements ---
+        let container, infoDiv;
+        let newLinkLabelInput, newLinkURLInput, linkShapeSelect;
+        let enablePlacingCheckbox, allowOverlapCheckbox;
+        let linkColorInput, linkRoughnessSlider, linkMetalnessSlider;
+        let dirLightColorInput, hemiSkyColorInput, hemiGroundColorInput;
+        let useHdriBackgroundCheckbox, bgColorInput;
+        let enableBloomCheckbox, bloomStrengthSlider, bloomRadiusSlider, bloomThresholdSlider;
+        let saveSettingsButton, loadSettingsButton, resetSettingsButton;
+
+        // --- Initialization ---
+        function init() {
+            console.log("Initializing 3D Link Hub...");
+            container = document.getElementById('container');
+            if (!container) {
+                console.error("Container element not found!");
+                return;
+            }
+            infoDiv = document.getElementById('info'); // For potential future use (e.g., messages)
+
+            getUIElements();
+
+            setupScene();
+            setupCSS2DRenderer();
+            setupControls();
+            setupLighting();
+            setupRaycasting();
+
+            // Load assets concurrently and then setup dependent parts
+            loadAssets().then(() => {
+                console.log("Assets loaded (or failed gracefully).");
+                setupPlatform(); // Depends on textures
+                setupEnvironment(); // Depends on HDRI
+                applySettingsToScene(); // Apply loaded/default settings that depend on assets
+                setupEventListeners(); // Add listeners after everything is set up
+                setupEffects(); // Setup post-processing last
+                loadSettings(); // Load settings AFTER UI and scene are ready
+                animate();
+                console.log("Initialization complete.");
+            }).catch(error => {
+                console.error("Error during asset loading phase:", error);
+                // Attempt to continue with fallbacks
+                setupPlatform();
+                setupEnvironment();
+                applySettingsToScene();
+                setupEventListeners();
+                setupEffects();
+                loadSettings();
+                animate();
+                 console.warn("Continued initialization with potential fallbacks.");
+            });
+        }
+
+        function getUIElements() {
+            newLinkLabelInput = document.getElementById('newLinkLabel');
+            newLinkURLInput = document.getElementById('newLinkURL');
+            linkShapeSelect = document.getElementById('linkShape');
+            enablePlacingCheckbox = document.getElementById('enablePlacing');
+            allowOverlapCheckbox = document.getElementById('allowOverlap');
+            linkColorInput = document.getElementById('linkColor');
+            linkRoughnessSlider = document.getElementById('linkRoughness');
+            linkMetalnessSlider = document.getElementById('linkMetalness');
+            dirLightColorInput = document.getElementById('dirLightColor');
+            hemiSkyColorInput = document.getElementById('hemiSkyColor');
+            hemiGroundColorInput = document.getElementById('hemiGroundColor');
+            useHdriBackgroundCheckbox = document.getElementById('useHdriBackground');
+            bgColorInput = document.getElementById('bgColor');
+            enableBloomCheckbox = document.getElementById('enableBloom');
+            bloomStrengthSlider = document.getElementById('bloomStrength');
+            bloomRadiusSlider = document.getElementById('bloomRadius');
+            bloomThresholdSlider = document.getElementById('bloomThreshold');
+            saveSettingsButton = document.getElementById('saveSettingsButton');
+            loadSettingsButton = document.getElementById('loadSettingsButton');
+            resetSettingsButton = document.getElementById('resetSettingsButton');
+        }
+
+        function setupScene() {
+            console.log("Setting up scene, camera, renderer...");
+            scene = new THREE.Scene();
+
+            camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.set(0, 5, 10);
+            camera.lookAt(0, 0, 0);
+
+            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(window.devicePixelRatio);
+            // PBR Configuration
+            renderer.outputColorSpace = THREE.SRGBColorSpace; // Crucial for PBR
+            renderer.toneMapping = THREE.ACESFilmicToneMapping;
+            renderer.toneMappingExposure = 1.0;
+            renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+            container.appendChild(renderer.domElement);
+            console.log("Renderer initialized and appended.");
+        }
+
+        function setupCSS2DRenderer() {
+             console.log("Setting up CSS2DRenderer...");
+             labelRenderer = new CSS2DRenderer();
+             labelRenderer.setSize(window.innerWidth, window.innerHeight);
+             labelRenderer.domElement.style.position = 'absolute';
+             labelRenderer.domElement.style.top = '0px';
+             labelRenderer.domElement.style.pointerEvents = 'none'; // Don't let labels interfere with 3D interaction
+             container.appendChild(labelRenderer.domElement);
+             console.log("CSS2DRenderer initialized and appended.");
+        }
+
+        function setupControls() {
+            console.log("Setting up OrbitControls...");
+            controls = new OrbitControls(camera, container); // Use container to avoid capturing UI clicks
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.05;
+            controls.screenSpacePanning = false;
+            controls.minDistance = 2;
+            controls.maxDistance = 50;
+            controls.maxPolarAngle = Math.PI / 2 - 0.05; // Prevent camera going below ground
+            controls.target.set(0, 0.5, 0); // Look slightly above the ground origin
+            controls.update();
+
+            // Add dragging class for visual feedback
+             controls.addEventListener('start', () => { document.body.classList.add('grabbing'); isDragging = true; });
+             controls.addEventListener('end', () => { document.body.classList.remove('grabbing'); isDragging = false; checkHoverAndCursor(); /* Re-check hover after drag ends */ });
+
+            console.log("OrbitControls initialized.");
+        }
+
+        function setupLighting() {
+            console.log("Setting up lights...");
+            // Hemisphere Light (Ambient)
+            hemisphereLight = new THREE.HemisphereLight(0xadccec, 0x404040, 1.5); // Sky, Ground, Intensity
+            scene.add(hemisphereLight);
+
+            // Directional Light (Sun)
+            directionalLight = new THREE.DirectionalLight(0xffffff, 3.0); // Color, Intensity
+            directionalLight.position.set(10, 20, 10);
+            directionalLight.castShadow = true;
+            // Shadow properties
+            directionalLight.shadow.mapSize.width = 2048;
+            directionalLight.shadow.mapSize.height = 2048;
+            directionalLight.shadow.camera.near = 0.5;
+            directionalLight.shadow.camera.far = 50;
+            directionalLight.shadow.camera.left = -PLATFORM_SIZE / 2;
+            directionalLight.shadow.camera.right = PLATFORM_SIZE / 2;
+            directionalLight.shadow.camera.top = PLATFORM_SIZE / 2;
+            directionalLight.shadow.camera.bottom = -PLATFORM_SIZE / 2;
+            directionalLight.shadow.bias = -0.001; // Adjust if shadow acne occurs
+
+            scene.add(directionalLight);
+            scene.add(directionalLight.target); // Target is needed for positioning
+            directionalLight.target.position.set(0, 0, 0);
+
+             // Optional: Add a visualizer for the shadow camera
+            // const shadowCamHelper = new THREE.CameraHelper(directionalLight.shadow.camera);
+            // scene.add(shadowCamHelper);
+
+            console.log("Lights added to scene.");
+        }
+
+        function loadAssets() {
+            console.log("Loading assets...");
+            const textureLoader = new THREE.TextureLoader();
+            const rgbeLoader = new RGBELoader();
+
+            const promises = [];
+
+            // HDRI
+            promises.push(
+                rgbeLoader.loadAsync(HDRI_URL)
+                    .then(texture => {
+                        hdriTexture = texture;
+                        console.log("HDRI loaded successfully.");
+                    })
+                    .catch(err => {
+                        console.warn("Failed to load HDRI:", err, "- Will fallback to solid color.");
+                        hdriTexture = null; // Ensure it's null on failure
+                        useHdriBg = false; // Force solid background mode
+                    })
+            );
+
+             // Ground Textures
+            promises.push(
+                textureLoader.loadAsync(GROUND_NORMAL_URL)
+                    .then(texture => {
+                        texture.wrapS = THREE.RepeatWrapping;
+                        texture.wrapT = THREE.RepeatWrapping;
+                        texture.repeat.set(8, 8); // Adjust tiling
+                        groundNormalMap = texture;
+                        console.log("Ground normal map loaded.");
+                    })
+                    .catch(err => {
+                        console.warn("Failed to load ground normal map:", err);
+                        groundNormalMap = null;
+                    })
+            );
+             promises.push(
+                textureLoader.loadAsync(GROUND_ROUGHNESS_URL)
+                    .then(texture => {
+                        texture.wrapS = THREE.RepeatWrapping;
+                        texture.wrapT = THREE.RepeatWrapping;
+                         texture.repeat.set(8, 8); // Adjust tiling
+                        groundRoughnessMap = texture;
+                        console.log("Ground roughness map loaded.");
+                    })
+                    .catch(err => {
+                        console.warn("Failed to load ground roughness map:", err);
+                        groundRoughnessMap = null;
+                    })
+            );
+
+             // Link Metalness Texture
+            promises.push(
+                 textureLoader.loadAsync(LINK_METAL_URL)
+                    .then(texture => {
+                        linkMetalMap = texture;
+                        console.log("Link metalness map loaded.");
+                    })
+                    .catch(err => {
+                        console.warn("Failed to load link metalness map:", err);
+                        linkMetalMap = null;
+                    })
+            );
+
+            return Promise.allSettled(promises); // Wait for all, regardless of success/failure
+        }
+
+
+        function setupPlatform() {
+             console.log("Setting up ground platform...");
+            const platformGeometry = new THREE.BoxGeometry(PLATFORM_SIZE, 0.2, PLATFORM_SIZE);
+            const platformMaterial = new THREE.MeshStandardMaterial({
+                color: 0x888888, // Base color if textures fail
+                roughness: 1.0,  // Default roughness
+                metalness: 0.0,  // Non-metallic by default
+            });
+
+            if (groundNormalMap) {
+                 platformMaterial.normalMap = groundNormalMap;
+                 platformMaterial.normalScale = new THREE.Vector2(0.5, 0.5); // Adjust normal strength
+                 console.log("Applied normal map to platform.");
+            } else {
+                console.warn("Platform using default material (no normal map).");
+            }
+             if (groundRoughnessMap) {
+                 platformMaterial.roughnessMap = groundRoughnessMap;
+                 platformMaterial.roughness = 1.0; // Let map control roughness fully
+                 console.log("Applied roughness map to platform.");
+            } else {
+                 console.warn("Platform using default roughness value (no roughness map).");
+                 platformMaterial.roughness = 0.9; // Fallback roughness
+            }
+
+            platformMesh = new THREE.Mesh(platformGeometry, platformMaterial);
+            platformMesh.position.y = -0.1; // Position it slightly below y=0
+            platformMesh.receiveShadow = true;
+            platformMesh.userData.isPlatform = true; // Identifier for raycasting
+            scene.add(platformMesh);
+            console.log("Platform added to scene.");
+        }
+
+        function setupEnvironment() {
+            console.log("Setting up environment (HDRI/Fog)...");
+            pmremGenerator = new THREE.PMREMGenerator(renderer);
+            pmremGenerator.compileEquirectangularShader();
+
+            updateEnvironmentMap(); // Apply initially loaded HDRI (or null)
+            updateBackground(); // Setup background/fog based on initial state
+            console.log("Environment setup complete.");
+        }
+
+        function updateEnvironmentMap() {
+             if (hdriTexture) {
+                try {
+                    const envMap = pmremGenerator.fromEquirectangular(hdriTexture).texture;
+                    scene.environment = envMap;
+                    hdriTexture.mapping = THREE.EquirectangularReflectionMapping; // Needed for skybox background
+                    console.log("HDRI applied to scene.environment.");
+                } catch (error) {
+                    console.error("Error processing HDRI for environment map:", error);
+                    scene.environment = null;
+                }
+             } else {
+                 console.warn("No HDRI texture available, scene.environment set to null.");
+                 scene.environment = null; // Ensure no env map if HDRI failed
+             }
+             // Update materials of existing links
+             linkObjects.forEach(link => {
+                 if (link.mesh.material.needsUpdate !== undefined) {
+                     link.mesh.material.needsUpdate = true;
+                 }
+             });
+             if(platformMesh && platformMesh.material.needsUpdate !== undefined) {
+                 platformMesh.material.needsUpdate = true;
+             }
+        }
+
+
+        function setupEffects() {
+            console.log("Setting up EffectComposer and Bloom...");
+            composer = new EffectComposer(renderer);
+            const renderPass = new RenderPass(scene, camera);
+            composer.addPass(renderPass);
+
+            bloomPass = new UnrealBloomPass(
+                new THREE.Vector2(window.innerWidth, window.innerHeight),
+                1.5, // strength
+                0.4, // radius
+                0.85 // threshold
+            );
+            bloomPass.enabled = bloomEnabled; // Initially disabled based on global var
+            composer.addPass(bloomPass);
+
+            console.log("Effects setup complete.");
+        }
+
+
+        function setupRaycasting() {
+            console.log("Setting up Raycaster...");
+            raycaster = new THREE.Raycaster();
+            mouse = new THREE.Vector2();
+            console.log("Raycaster initialized.");
+        }
+
+        function setupEventListeners() {
+            console.log("Setting up event listeners...");
+            window.addEventListener('resize', onWindowResize);
+            container.addEventListener('mousemove', onMouseMove);
+            container.addEventListener('mousedown', onMouseDown); // Use mousedown for placement start
+            container.addEventListener('click', onClick); // Use click for opening links
+
+            // --- UI Listeners ---
+            enablePlacingCheckbox.addEventListener('change', (e) => {
+                placingEnabled = e.target.checked;
+                console.log(`Placing mode ${placingEnabled ? 'enabled' : 'disabled'}`);
+                checkHoverAndCursor(); // Update cursor immediately
+                saveSettings();
+            });
+            allowOverlapCheckbox.addEventListener('change', (e) => {
+                allowOverlap = e.target.checked;
+                console.log(`Allow overlap ${allowOverlap ? 'enabled' : 'disabled'}`);
+                saveSettings();
+            });
+
+            linkShapeSelect.addEventListener('change', () => {
+                console.log("Link shape changed, recreating links...");
+                recreateLinks();
+                saveSettings();
+            });
+
+             // Material properties - update materials directly
+             linkColorInput.addEventListener('input', () => { updateLinkMaterial(); saveSettings(); });
+             linkRoughnessSlider.addEventListener('input', () => { updateLinkMaterial(); saveSettings(); });
+             linkMetalnessSlider.addEventListener('input', () => { updateLinkMaterial(); saveSettings(); });
+
+             // Lighting properties
+             dirLightColorInput.addEventListener('input', () => { updateLighting(); saveSettings(); });
+             hemiSkyColorInput.addEventListener('input', () => { updateLighting(); saveSettings(); });
+             hemiGroundColorInput.addEventListener('input', () => { updateLighting(); saveSettings(); });
+
+            // Environment
+            useHdriBackgroundCheckbox.addEventListener('change', (e) => {
+                 useHdriBg = e.target.checked;
+                 console.log(`Use HDRI Background: ${useHdriBg}`);
+                 bgColorInput.disabled = useHdriBg; // Enable/disable color picker
+                 updateBackground();
+                 saveSettings();
+            });
+            bgColorInput.addEventListener('input', () => {
+                if (!useHdriBg) { // Only update if solid color mode is active
+                    updateBackground();
+                }
+                 saveSettings();
+            });
+
+             // Effects
+             enableBloomCheckbox.addEventListener('change', (e) => {
+                 bloomEnabled = e.target.checked;
+                 bloomPass.enabled = bloomEnabled;
+                 console.log(`Bloom effect ${bloomEnabled ? 'enabled' : 'disabled'}`);
+                 updateBloomUI(); // Enable/disable sliders
+                 saveSettings();
+             });
+             bloomStrengthSlider.addEventListener('input', () => { updateBloom(); saveSettings(); });
+             bloomRadiusSlider.addEventListener('input', () => { updateBloom(); saveSettings(); });
+             bloomThresholdSlider.addEventListener('input', () => { updateBloom(); saveSettings(); });
+
+             // Settings Buttons
+             saveSettingsButton.addEventListener('click', saveSettings);
+             loadSettingsButton.addEventListener('click', loadSettings);
+             resetSettingsButton.addEventListener('click', resetSettings);
+
+            console.log("Event listeners attached.");
+        }
+
+        // --- Interaction Functions ---
+
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            labelRenderer.setSize(window.innerWidth, window.innerHeight);
+            composer.setSize(window.innerWidth, window.innerHeight);
+             console.log("Window resized.");
+        }
+
+        function onMouseMove(event) {
+            // Calculate mouse position in normalized device coordinates (-1 to +1)
+            mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+            mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+
+            // Only check hover if not currently dragging the view
+            if (!isDragging) {
+                 checkHoverAndCursor();
+            }
+        }
+
+         function onMouseDown(event) {
+             // Prevent default text selection behavior during drag
+             // event.preventDefault();
+
+             // Check for placement click IMMEDIATELY on mouse down
+             if (placingEnabled) {
+                 mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+                 mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+                 raycaster.setFromCamera(mouse, camera);
+                 const intersects = raycaster.intersectObject(platformMesh);
+
+                 if (intersects.length > 0) {
+                     placeObject(intersects[0]);
+                 }
+             }
+         }
+
+
+        function onClick(event) {
+            // This handles clicking on existing links AFTER mouse up
+             if (currentHovered && currentHovered.object.userData.isLink) {
+                 console.log(`Opening link: ${currentHovered.object.userData.label} - ${currentHovered.object.userData.url}`);
+                 window.open(currentHovered.object.userData.url, '_blank');
+             }
+        }
+
+         function checkHoverAndCursor() {
+             raycaster.setFromCamera(mouse, camera);
+
+             // Combine potential targets for raycasting
+             const interactableObjects = linkObjects.map(item => item.mesh);
+             if (platformMesh) interactableObjects.push(platformMesh);
+
+             const intersects = raycaster.intersectObjects(interactableObjects);
+
+             let intersectedLink = null;
+             let intersectedPlatform = false;
+
+             if (intersects.length > 0) {
+                 const firstIntersect = intersects[0].object;
+                 if (firstIntersect.userData.isLink) {
+                     intersectedLink = firstIntersect;
+                 } else if (firstIntersect.userData.isPlatform) {
+                     intersectedPlatform = true;
+                 }
+             }
+
+            // --- Handle Hover Effects ---
+             if (intersectedLink) {
+                 if (!currentHovered || currentHovered.object !== intersectedLink) {
+                     // If hovering over a new link object
+                     clearHoverEffect(); // Clear previous hover
+                     applyHoverEffect(intersectedLink);
+                     currentHovered = {
+                         object: intersectedLink,
+                         originalScale: intersectedLink.scale.clone(),
+                         originalEmissive: intersectedLink.material.emissive.clone()
+                     };
+                     controls.autoRotate = false; // Stop autorotate on hover
+                 }
+                 document.body.classList.add('pointer'); // Set pointer cursor for links
+                 document.body.classList.remove('crosshair');
+             } else {
+                 // Not hovering over a link
+                 if (currentHovered) {
+                     clearHoverEffect();
+                     currentHovered = null;
+                     controls.autoRotate = false; // Keep autorotate stopped briefly after leaving link
+                 }
+
+                 // Set cursor based on platform hover and placing mode
+                 if (placingEnabled && intersectedPlatform) {
+                     document.body.classList.add('crosshair');
+                 } else {
+                     document.body.classList.remove('crosshair');
+                 }
+                 document.body.classList.remove('pointer');
+             }
+         }
+
+        function applyHoverEffect(object) {
+            if (object && object.material) {
+                object.scale.multiplyScalar(HOVER_SCALE);
+                if (object.material.emissive) {
+                    object.material.emissive.set(HOVER_EMISSIVE_COLOR);
+                }
+                 // Ensure label visibility might be adjusted if needed (optional)
+                 const linkPair = linkObjects.find(pair => pair.mesh === object);
+                 if (linkPair && linkPair.label) {
+                     linkPair.label.element.style.zIndex = '1'; // Bring label forward (optional)
+                 }
+            }
+        }
+
+        function clearHoverEffect() {
+            if (currentHovered) {
+                const object = currentHovered.object;
+                object.scale.copy(currentHovered.originalScale);
+                if (object.material.emissive) {
+                    object.material.emissive.copy(currentHovered.originalEmissive);
+                }
+                 // Reset label z-index (optional)
+                const linkPair = linkObjects.find(pair => pair.mesh === object);
+                 if (linkPair && linkPair.label) {
+                     linkPair.label.element.style.zIndex = '0';
+                 }
+            }
+        }
+
+
+        // --- Placement Logic ---
+        function placeObject(intersection) {
+            console.log("Attempting to place object...");
+            const label = newLinkLabelInput.value.trim();
+            const url = newLinkURLInput.value.trim();
+
+            if (!label || !url) {
+                console.warn("Placement failed: Label and URL cannot be empty.");
+                alert("Please provide both a label and a valid URL.");
+                return;
+            }
+            // Simple URL validation (basic check)
+             try {
+                 new URL(url);
+             } catch (_) {
+                 console.warn("Placement failed: Invalid URL format.");
+                 alert("Please enter a valid URL (e.g., https://example.com).");
+                 return;
+             }
+
+
+            const shape = linkShapeSelect.value;
+            const geometry = getGeometryForShape(shape);
+            if (!geometry) return; // Error handled in getGeometryForShape
+
+            geometry.computeBoundingBox();
+            const size = new THREE.Vector3();
+            geometry.boundingBox.getSize(size);
+            const placeY = intersection.point.y + size.y / 2 + LINK_VERTICAL_OFFSET;
+            const position = new THREE.Vector3(intersection.point.x, placeY, intersection.point.z);
+
+            // --- Collision Detection ---
+             if (!allowOverlap) {
+                 console.log("Checking for collisions...");
+                 const newObjectBox = new THREE.Box3();
+                 // Set the box based on geometry bounds and potential position/scale
+                 newObjectBox.copy(geometry.boundingBox);
+                 newObjectBox.applyMatrix4(new THREE.Matrix4().makeScale(1, 1, 1)); // Apply default scale first
+                 newObjectBox.applyMatrix4(new THREE.Matrix4().makeTranslation(position.x, position.y, position.z));
+
+                 for (const existingLink of linkObjects) {
+                     const existingMesh = existingLink.mesh;
+                     // Ensure matrixWorld is up to date BEFORE getting bounding box
+                     existingMesh.updateMatrixWorld(true); // Force update
+
+                     const existingBox = new THREE.Box3().setFromObject(existingMesh, true); // Use precise box helper
+
+                     if (newObjectBox.intersectsBox(existingBox)) {
+                         console.warn(`Placement failed: Collision detected with existing object "${existingMesh.userData.label}"`);
+                         alert("Placement failed: Object would overlap with an existing object. Enable 'Allow Overlap' or choose a different location.");
+                         geometry.dispose(); // Dispose temporary geometry
+                         return; // Stop placement
+                     }
+                 }
+                 console.log("No collisions detected.");
+             }
+
+            // --- Create Mesh ---
+            const material = new THREE.MeshStandardMaterial({
+                color: linkColorInput.value,
+                roughness: parseFloat(linkRoughnessSlider.value),
+                metalness: parseFloat(linkMetalnessSlider.value),
+                envMap: scene.environment, // Apply current environment map
+                metalnessMap: linkMetalMap, // Apply loaded metalness map (if any)
+                // Add other maps if needed (normal, ao, etc.) - currently only metalness
+            });
+            const mesh = new THREE.Mesh(geometry, material);
+            mesh.position.copy(position);
+            mesh.castShadow = true;
+            mesh.receiveShadow = false; // Links typically don't receive shadows on themselves
+            mesh.userData = { isLink: true, url: url, label: label }; // Store data
+
+            // --- Create Label ---
+            const linkDiv = document.createElement('div');
+            linkDiv.className = 'link-label';
+            linkDiv.textContent = label;
+            const labelObject = new CSS2DObject(linkDiv);
+            // Position label relative to the mesh center, slightly above
+            labelObject.position.set(0, size.y / 2 + 0.2, 0); // Adjust offset as needed
+            mesh.add(labelObject); // Attach label TO the mesh
+
+            // --- Add to Scene and Data ---
+            scene.add(mesh);
+            linkObjects.push({ mesh: mesh, label: labelObject });
+            linksData.push({ label: label, url: url, position: position.clone(), shape: shape }); // Store shape too
+
+            console.log(`Placed link "${label}" at ${position.x.toFixed(2)}, ${position.y.toFixed(2)}, ${position.z.toFixed(2)}`);
+
+            // Optional: Clear input fields after successful placement
+            // newLinkLabelInput.value = '';
+            // newLinkURLInput.value = '';
+        }
+
+
+        // --- Update Functions ---
+
+        function updateLinkMaterial() {
+             const newColor = new THREE.Color(linkColorInput.value);
+             const newRoughness = parseFloat(linkRoughnessSlider.value);
+             const newMetalness = parseFloat(linkMetalnessSlider.value);
+
+             linkObjects.forEach(link => {
+                 const mat = link.mesh.material;
+                 if (mat instanceof THREE.MeshStandardMaterial) {
+                     mat.color.set(newColor);
+                     mat.roughness = newRoughness;
+                     mat.metalness = newMetalness;
+                     mat.metalnessMap = linkMetalMap; // Re-apply in case it was null before
+                     mat.envMap = scene.environment; // Ensure env map is current
+                     mat.needsUpdate = true;
+                 }
+             });
+             console.log("Updated link materials.");
+        }
+
+        function updateLighting() {
+            directionalLight.color.set(dirLightColorInput.value);
+            hemisphereLight.color.set(hemiSkyColorInput.value);
+            hemisphereLight.groundColor.set(hemiGroundColorInput.value);
+            console.log("Updated lighting colors.");
+        }
+
+        function updateBackground() {
+             const bgColor = new THREE.Color(bgColorInput.value);
+
+             if (useHdriBg && hdriTexture) {
+                 scene.background = hdriTexture; // Use loaded HDRI as skybox
+                 scene.fog = null; // Remove fog when using HDRI background
+                 console.log("Set background to HDRI.");
+             } else {
+                 scene.background = bgColor; // Use solid color
+                 // Setup or update fog to match the background color
+                 if (!scene.fog) {
+                     scene.fog = new THREE.Fog(bgColor, 10, 80); // Adjust near/far as needed
+                     console.log("Added Fog.");
+                 } else {
+                     scene.fog.color.copy(bgColor);
+                     console.log("Updated Fog color.");
+                 }
+                 if (!hdriTexture && useHdriBg) {
+                     console.warn("Attempted to use HDRI background, but HDRI failed to load. Using solid color fallback.");
+                 } else {
+                     console.log("Set background to solid color.");
+                 }
+             }
+             // Ensure environment map is still set correctly (doesn't depend on background choice)
+             updateEnvironmentMap();
+        }
+
+         function updateBloom() {
+            bloomPass.strength = parseFloat(bloomStrengthSlider.value);
+            bloomPass.radius = parseFloat(bloomRadiusSlider.value);
+            bloomPass.threshold = parseFloat(bloomThresholdSlider.value);
+            console.log(`Bloom updated: S=${bloomPass.strength}, R=${bloomPass.radius}, T=${bloomPass.threshold}`);
+        }
+
+         function updateBloomUI() {
+            const disabled = !bloomEnabled;
+            bloomStrengthSlider.disabled = disabled;
+            bloomRadiusSlider.disabled = disabled;
+            bloomThresholdSlider.disabled = disabled;
+         }
+
+        function recreateLinks() {
+             console.log("Recreating links with new shape:", linkShapeSelect.value);
+             // 1. Remove existing link objects from scene and dispose resources
+             linkObjects.forEach(link => {
+                 disposeObject(link.mesh); // Handles mesh, geometry, material, label
+             });
+             linkObjects = []; // Clear the array
+
+             // 2. Recreate links based on linksData
+             const currentShape = linkShapeSelect.value;
+             const linkColor = linkColorInput.value;
+             const linkRoughness = parseFloat(linkRoughnessSlider.value);
+             const linkMetalness = parseFloat(linkMetalnessSlider.value);
+
+             linksData.forEach(data => {
+                 const geometry = getGeometryForShape(currentShape);
+                 if (!geometry) return; // Skip if shape is invalid
+
+                 geometry.computeBoundingBox(); // Needed for label positioning
+                 const size = new THREE.Vector3();
+                 geometry.boundingBox.getSize(size);
+
+                 const material = new THREE.MeshStandardMaterial({
+                    color: linkColor,
+                    roughness: linkRoughness,
+                    metalness: linkMetalness,
+                    envMap: scene.environment,
+                    metalnessMap: linkMetalMap,
+                 });
+
+                 const mesh = new THREE.Mesh(geometry, material);
+                 mesh.position.copy(data.position); // Use stored position
+                 mesh.castShadow = true;
+                 mesh.receiveShadow = false;
+                 mesh.userData = { isLink: true, url: data.url, label: data.label };
+
+                 const linkDiv = document.createElement('div');
+                 linkDiv.className = 'link-label';
+                 linkDiv.textContent = data.label;
+                 const labelObject = new CSS2DObject(linkDiv);
+                 labelObject.position.set(0, size.y / 2 + 0.2, 0);
+                 mesh.add(labelObject);
+
+                 scene.add(mesh);
+                 linkObjects.push({ mesh: mesh, label: labelObject });
+             });
+             console.log("Links recreated.");
+        }
+
+        // --- Helper Functions ---
+
+        function getGeometryForShape(shapeName) {
+            let geometry;
+            const size = 1; // Base size for objects
+            const detail = 2; // Medium detail for curved shapes
+
+            try {
+                switch (shapeName) {
+                    case 'Cube':
+                        geometry = new THREE.BoxGeometry(size, size, size);
+                        break;
+                    case 'Sphere':
+                        geometry = new THREE.SphereGeometry(size / 2, 32 * detail, 16 * detail);
+                        break;
+                    case 'Torus':
+                        geometry = new THREE.TorusGeometry(size / 2.5, size / 6, 16 * detail, 50 * detail);
+                        break;
+                    case 'Cone':
+                        geometry = new THREE.ConeGeometry(size / 2, size * 1.2, 32 * detail);
+                        break;
+                    case 'Icosahedron':
+                        geometry = new THREE.IcosahedronGeometry(size / 2, detail > 1 ? detail -1 : 0); // Detail param is subdivision level
+                        break;
+                    case 'Dodecahedron':
+                         geometry = new THREE.DodecahedronGeometry(size / 2, detail > 1 ? detail -1 : 0); // Detail param is subdivision level
+                        break;
+                    default:
+                        console.warn(`Unknown shape name: ${shapeName}. Defaulting to Cube.`);
+                        geometry = new THREE.BoxGeometry(size, size, size);
+                }
+            } catch (error) {
+                 console.error(`Error creating geometry for shape "${shapeName}":`, error);
+                 return null; // Return null on error
+            }
+             return geometry;
+        }
+
+         function disposeObject(object) {
+             if (!object) return;
+
+             // Remove labels first if they are children
+             const labelsToRemove = [];
+             object.traverse(child => {
+                 if (child instanceof CSS2DObject) {
+                     labelsToRemove.push(child);
+                 }
+             });
+             labelsToRemove.forEach(label => {
+                  label.element.remove(); // Remove label's DOM element
+                  object.remove(label); // Remove label from mesh parent
+             });
+
+
+             // Dispose geometry and material
+             if (object.geometry) {
+                 object.geometry.dispose();
+                 // console.log("Disposed geometry for", object.uuid);
+             }
+             if (object.material) {
+                 // If material is an array, dispose each one
+                 if (Array.isArray(object.material)) {
+                     object.material.forEach(material => {
+                         disposeMaterial(material);
+                     });
+                 } else {
+                     disposeMaterial(object.material);
+                 }
+                 // console.log("Disposed material for", object.uuid);
+             }
+
+             // Remove object from its parent (the scene)
+             if (object.parent) {
+                 object.parent.remove(object);
+                 // console.log("Removed object from parent", object.uuid);
+             }
+         }
+
+        function disposeMaterial(material) {
+             if (!material) return;
+             material.dispose();
+
+             // Dispose textures used by the material
+             for (const key of Object.keys(material)) {
+                 const value = material[key];
+                 if (value instanceof THREE.Texture) {
+                     value.dispose();
+                     // console.log("Disposed texture", key);
+                 }
+             }
+         }
+
+        // --- Persistence ---
+
+        function saveSettings() {
+            const settings = {
+                version: 1, // In case format changes later
+                shape: linkShapeSelect.value,
+                linkColor: linkColorInput.value,
+                linkRoughness: linkRoughnessSlider.value,
+                linkMetalness: linkMetalnessSlider.value,
+                dirLightColor: dirLightColorInput.value,
+                hemiSkyColor: hemiSkyColorInput.value,
+                hemiGroundColor: hemiGroundColorInput.value,
+                useHdriBackground: useHdriBackgroundCheckbox.checked,
+                bgColor: bgColorInput.value,
+                enableBloom: enableBloomCheckbox.checked,
+                bloomStrength: bloomStrengthSlider.value,
+                bloomRadius: bloomRadiusSlider.value,
+                bloomThreshold: bloomThresholdSlider.value,
+                enablePlacing: enablePlacingCheckbox.checked,
+                allowOverlap: allowOverlapCheckbox.checked,
+            };
+            try {
+                localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+                console.log("Settings saved to localStorage.");
+            } catch (e) {
+                console.error("Failed to save settings to localStorage:", e);
+            }
+        }
+
+        function loadSettings() {
+             console.log("Attempting to load settings from localStorage...");
+            const savedSettings = localStorage.getItem(SETTINGS_KEY);
+            if (savedSettings) {
+                try {
+                    const settings = JSON.parse(savedSettings);
+                    console.log("Loaded settings:", settings);
+
+                     // Apply settings to UI elements
+                    linkShapeSelect.value = settings.shape ?? 'Cube';
+                    linkColorInput.value = settings.linkColor ?? '#ffffff';
+                    linkRoughnessSlider.value = settings.linkRoughness ?? 0.5;
+                    linkMetalnessSlider.value = settings.linkMetalness ?? 0.8;
+                    dirLightColorInput.value = settings.dirLightColor ?? '#ffffff';
+                    hemiSkyColorInput.value = settings.hemiSkyColor ?? '#adccec';
+                    hemiGroundColorInput.value = settings.hemiGroundColor ?? '#404040';
+                    useHdriBackgroundCheckbox.checked = settings.useHdriBackground ?? true;
+                    bgColorInput.value = settings.bgColor ?? '#202030';
+                    enableBloomCheckbox.checked = settings.enableBloom ?? false;
+                    bloomStrengthSlider.value = settings.bloomStrength ?? 0.6;
+                    bloomRadiusSlider.value = settings.bloomRadius ?? 0.4;
+                    bloomThresholdSlider.value = settings.bloomThreshold ?? 0.85;
+                    enablePlacingCheckbox.checked = settings.enablePlacing ?? false;
+                    allowOverlapCheckbox.checked = settings.allowOverlap ?? true;
+
+                    // Apply settings to the application state / scene
+                    applySettingsToScene();
+
+
+                } catch (e) {
+                    console.error("Failed to parse saved settings:", e);
+                    applyDefaultSettings(); // Apply defaults if parsing fails
+                }
+            } else {
+                 console.log("No saved settings found, applying defaults.");
+                 applyDefaultSettings(); // Apply defaults if no settings saved
+            }
+        }
+
+        function applySettingsToScene() {
+            console.log("Applying loaded/default settings to scene objects...");
+             // Update internal state variables from UI controls
+             placingEnabled = enablePlacingCheckbox.checked;
+             allowOverlap = allowOverlapCheckbox.checked;
+             useHdriBg = useHdriBackgroundCheckbox.checked;
+             bloomEnabled = enableBloomCheckbox.checked;
+
+             // Update 3D elements
+             updateLinkMaterial(); // Updates all existing (though none exist on initial load)
+             updateLighting();
+             updateBackground();
+             updateBloom();
+             updateBloomUI(); // Sync UI disabled state
+
+            // Enable/disable background color picker based on HDRI checkbox
+             bgColorInput.disabled = useHdriBg;
+
+             // Update bloom pass enabled state directly
+             if (bloomPass) bloomPass.enabled = bloomEnabled;
+
+             console.log("Scene updated with current settings.");
+        }
+
+         function applyDefaultSettings() {
+            // Reset UI elements to their default values explicitly
+            linkShapeSelect.value = 'Cube';
+            linkColorInput.value = '#ffffff';
+            linkRoughnessSlider.value = 0.5;
+            linkMetalnessSlider.value = 0.8;
+            dirLightColorInput.value = '#ffffff';
+            hemiSkyColorInput.value = '#adccec';
+            hemiGroundColorInput.value = '#404040';
+            useHdriBackgroundCheckbox.checked = true;
+            bgColorInput.value = '#202030';
+            enableBloomCheckbox.checked = false;
+            bloomStrengthSlider.value = 0.6;
+            bloomRadiusSlider.value = 0.4;
+            bloomThresholdSlider.value = 0.85;
+            enablePlacingCheckbox.checked = false;
+            allowOverlapCheckbox.checked = true;
+
+            // Re-apply these defaults to the scene
+             applySettingsToScene();
+             console.log("Applied default settings.");
+         }
+
+        function resetSettings() {
+            console.log("Resetting settings...");
+            if (confirm("Are you sure you want to reset all settings to their defaults? Placed items will remain until refresh.")) {
+                localStorage.removeItem(SETTINGS_KEY);
+                console.log("Removed settings from localStorage.");
+                applyDefaultSettings(); // Apply defaults to UI and scene
+                // Note: This doesn't remove placed objects visually until refresh.
+            }
+        }
+
+
+        // --- Animation Loop ---
+        function animate() {
+            requestAnimationFrame(animate);
+
+            controls.update(); // Only required if controls.enableDamping or controls.autoRotate are set
+
+            // Render using composer if bloom is enabled, otherwise use standard renderer
+            if (bloomEnabled && composer) {
+                composer.render();
+            } else {
+                renderer.render(scene, camera);
+            }
+
+             // Render labels on top
+             labelRenderer.render(scene, camera);
+        }
+
+        // --- Start ---
+        init();
+
+    </script>
+
+</body>
+</html>
